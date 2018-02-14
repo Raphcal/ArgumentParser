@@ -1,4 +1,4 @@
-package fr.rca.args;
+package com.github.raphcal.argparser;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
