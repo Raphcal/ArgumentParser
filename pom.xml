@@ -8,8 +8,29 @@
 	<groupId>com.github.raphcal</groupId>
 	<artifactId>argument-parser</artifactId>
 	<packaging>jar</packaging>
-	<version>1.1</version>
+	<version>1.2</version>
 	<name>Argument Parser</name>
+	
+	<description>Parse program arguments.</description>
+	<url>https://github.com/raphcal/argument-parser</url>
+	<licenses>
+		<license>
+			<name>Lesser GPL 2.1</name>
+			<distribution>manual</distribution>
+			<url>https://www.gnu.org/licenses/old-licenses/lgpl-2.1.en.html</url>
+		</license>
+	</licenses>
+	
+	<scm>
+		<url>https://github.com/raphcal/argument-parser.git</url>
+	</scm>
+	
+	<developers>
+		<developer>
+			<name>Raphaël Calabro</name>
+			<email>ddaeke-github@yahoo.fr</email>
+		</developer>
+	</developers>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -68,6 +89,21 @@
 						<id>attach-javadocs</id>
 						<goals>
 							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>1.5</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>sign</goal>
 						</goals>
 					</execution>
 				</executions>
