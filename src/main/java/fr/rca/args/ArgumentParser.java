@@ -43,27 +43,35 @@ import java.util.logging.Logger;
  * @param <T> Type décrivant les arguments du programme.
  */
 public class ArgumentParser<T> {
-	private static final int LINE_LENGTH = 80;
+	private static final int DEFAULT_LINE_LENGTH = 80;
 	private static final int PREFIX_LENGTH = 9;
 	
 	private final Class<T> clazz;
 			
-	private Map<String, Entry> options;
-	private List<Entry> arguments;
+	private Map<String, ArgumentParserEntry> options;
+	private List<ArgumentParserEntry> arguments;
 	private int maxOptionNameLength;
 	
 	private int nonOptionalArgumentCount;
 	
+	private int lineLength = DEFAULT_LINE_LENGTH;
+	
+	/**
+	 * Creates a new parser for the given argument list class.
+	 *
+	 * @param clazz Class containing field annotated with {@link Argument}
+	 * and/or {@link Option} anotations.
+	 */
 	public ArgumentParser(Class<T> clazz) {
 		this.clazz = clazz;
 		
-		this.options = new LinkedHashMap<String, Entry>();
-		this.arguments = new ArrayList<Entry>();
-		final Map<Entry, Integer> priorities = new HashMap<Entry, Integer>();
+		this.options = new LinkedHashMap<String, ArgumentParserEntry>();
+		this.arguments = new ArrayList<ArgumentParserEntry>();
+		final Map<ArgumentParserEntry, Integer> priorities = new HashMap<ArgumentParserEntry, Integer>();
 		
 		final Field[] fields = clazz.getDeclaredFields();
 		for(final Field field : fields) {
-			final Entry entry = new Entry(field, field.getType() != boolean.class);
+			final ArgumentParserEntry entry = new ArgumentParserEntry(field, field.getType() != boolean.class);
 			
 			final Option option = field.getAnnotation(Option.class);
 			if(option != null) {
@@ -105,52 +113,25 @@ public class ArgumentParser<T> {
 			}
 		}
 		
-		Collections.sort(arguments, new Comparator<Entry>() {
+		Collections.sort(arguments, new Comparator<ArgumentParserEntry>() {
 			@Override
-			public int compare(Entry o1, Entry o2) {
+			public int compare(ArgumentParserEntry o1, ArgumentParserEntry o2) {
 				return priorities.get(o1).compareTo(priorities.get(o2));
 			}
 		});
 	}
 	
-	private <I> I newInstance(Class<I> clazz) {
-		try {
-			return clazz.newInstance();
-		} catch (InstantiationException ex) {
-			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Impossible d'instancier '" + clazz +"'. Chargement des arguments impossible.", ex);
-		} catch (IllegalAccessException ex) {
-			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Impossible d'instancier '" + clazz +"'. Chargement des arguments impossible.", ex);
-		}
-		return null;
-	}
-	
-	private <V> void set(T t, Entry entry, V value) {
-		try {
-			if(!entry.isCollection()) {
-				entry.getField().set(t, value);
-			} else {
-				Object object = entry.getField().get(t);
-				
-				if(object == null) {
-					object = newInstance(entry.getField().getType());
-					entry.getField().set(t, object);
-				}
-				
-				if (object instanceof Collection) {
-					final Collection<V> collection = (Collection<V>) object;
-					collection.add(value);
-				}
-			}
-			
-		} catch (SecurityException ex) {
-			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Accès non autorisé au champ '" + entry.getField().getName() + "'.", ex);
-		} catch (IllegalArgumentException ex) {
-			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Le champ '" + entry.getField().getName() + "' n'est pas compatible avec le type '" + value.getClass().getName() + "'.", ex);
-		} catch (IllegalAccessException ex) {
-			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Accès non autorisé au champ '" + entry.getField().getName() + "'.", ex);
-		}
-	}
-	
+	/**
+	 * Parse the given program arguments and creates an instance of
+	 * the argument list class.
+	 * <p>
+	 * If the number of required argument is not met, this method returns
+	 * <code>null</code>.
+	 * 
+	 * @param args Program arguments.
+	 * @return A new instance of <code>T</code> or <code>null</code> if the
+	 * parsing can't be completed.
+	 */
 	public T parse(String[] args) {
 		final T t = newInstance(clazz);
 		
@@ -162,7 +143,7 @@ public class ArgumentParser<T> {
 		for(int index = 0; index < args.length; index++) {
 			final String arg = args[index];
 			
-			Entry entry = options.get(arg);
+			ArgumentParserEntry entry = options.get(arg);
 			if(entry != null) {
 				if(entry.hasValue()) {
 					index++;
@@ -226,17 +207,34 @@ public class ArgumentParser<T> {
 			return null;
 		}
 	}
-	
-	private String createSpace(int length) {
-		final char[] chars = new char[length];
-		Arrays.fill(chars, ' ');
-		return new String(chars);
+
+	/**
+	 * Change the line length for the usage.
+	 *
+	 * @param lineLength Line length of the terminal window.
+	 */
+	public void setLineLength(int lineLength) {
+		this.lineLength = lineLength;
 	}
 	
+	/**
+	 * Prints the usage to the given output stream.
+	 * 
+	 * @param appName Name of the application.
+	 * @param outputStream Outputstream to use.
+	 * @throws IOException If an error occurs while printing the usage.
+	 */
 	public void printUsage(String appName, OutputStream outputStream) throws IOException {
 		printUsage(appName, new OutputStreamWriter(outputStream, Charset.defaultCharset()));
 	}
 	
+	/**
+	 * Prints the usage to the given writer.
+	 * 
+	 * @param appName Name of the application.
+	 * @param writer Writer to use.
+	 * @throws IOException If an error occurs while printing the usage.
+	 */
 	public void printUsage(String appName, Writer writer) throws IOException {
 		final String lineSeparator = System.getProperty("line.separator");
 		
@@ -247,9 +245,9 @@ public class ArgumentParser<T> {
 			writer.write(" [options]");
 		}
 		
-		final ArrayList<Entry> enums = new ArrayList<Entry>();
+		final ArrayList<ArgumentParserEntry> enums = new ArrayList<ArgumentParserEntry>();
 		
-		for(final Entry entry : arguments) {
+		for(final ArgumentParserEntry entry : arguments) {
 			if (!entry.isOptional()) {
 				writer.write(" <");
 				writer.write(entry.getField().getName());
@@ -270,7 +268,7 @@ public class ArgumentParser<T> {
 		writer.write(lineSeparator);
 		
 		if(!enums.isEmpty()) {
-			for(final Entry entry : enums) {
+			for(final ArgumentParserEntry entry : enums) {
 				writer.write(capitalize(plurialize(entry.getField().getName())));
 				writer.write(lineSeparator);
 				
@@ -287,11 +285,11 @@ public class ArgumentParser<T> {
 			writer.write("Options");
 			writer.write(lineSeparator);
 			
-			final LinkedHashSet<Entry> entries = new LinkedHashSet<Entry>();
-			for(final Map.Entry<String, Entry> entry : options.entrySet()) {
+			final LinkedHashSet<ArgumentParserEntry> entries = new LinkedHashSet<ArgumentParserEntry>();
+			for(final Map.Entry<String, ArgumentParserEntry> entry : options.entrySet()) {
 				entries.add(entry.getValue());
 			}
-			for(final Entry entry : entries) {
+			for(final ArgumentParserEntry entry : entries) {
 				final String name = entry.getAlias();
 				
 				writer.write("  ");
@@ -310,11 +308,55 @@ public class ArgumentParser<T> {
 		writer.flush();
 	}
 	
+	private <I> I newInstance(Class<I> clazz) {
+		try {
+			return clazz.newInstance();
+		} catch (InstantiationException ex) {
+			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Impossible d'instancier '" + clazz +"'. Chargement des arguments impossible.", ex);
+		} catch (IllegalAccessException ex) {
+			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Impossible d'instancier '" + clazz +"'. Chargement des arguments impossible.", ex);
+		}
+		return null;
+	}
+	
+	private <V> void set(T t, ArgumentParserEntry entry, V value) {
+		try {
+			if(!entry.isCollection()) {
+				entry.getField().set(t, value);
+			} else {
+				Object object = entry.getField().get(t);
+				
+				if(object == null) {
+					object = newInstance(entry.getField().getType());
+					entry.getField().set(t, object);
+				}
+				
+				if (object instanceof Collection) {
+					final Collection<V> collection = (Collection<V>) object;
+					collection.add(value);
+				}
+			}
+			
+		} catch (SecurityException ex) {
+			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Accès non autorisé au champ '" + entry.getField().getName() + "'.", ex);
+		} catch (IllegalArgumentException ex) {
+			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Le champ '" + entry.getField().getName() + "' n'est pas compatible avec le type '" + value.getClass().getName() + "'.", ex);
+		} catch (IllegalAccessException ex) {
+			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Accès non autorisé au champ '" + entry.getField().getName() + "'.", ex);
+		}
+	}
+	
+	private String createSpace(int length) {
+		final char[] chars = new char[length];
+		Arrays.fill(chars, ' ');
+		return new String(chars);
+	}
+	
 	private String[] cleanCut(String description) {
 		final ArrayList<String> lines = new ArrayList<String>();
 		
 		final StringBuilder stringBuilder = new StringBuilder(description);
-		final int maxLength = LINE_LENGTH - PREFIX_LENGTH - maxOptionNameLength;
+		final int maxLength = lineLength - PREFIX_LENGTH - maxOptionNameLength;
 		
 		while(stringBuilder.length() > maxLength) {
 			int cutIndex = stringBuilder.lastIndexOf(" ", maxLength);
@@ -343,7 +385,7 @@ public class ArgumentParser<T> {
 		}
 	}
 	
-	private <T extends Enum<T>> T toEnumValue(Entry entry, String value) {
+	private <T extends Enum<T>> T toEnumValue(ArgumentParserEntry entry, String value) {
 		@SuppressWarnings("unchecked")
 		final Class<T> enumType = (Class<T>)entry.getField().getType();
 		try {
@@ -354,80 +396,4 @@ public class ArgumentParser<T> {
 		return null;
 	} 
 	
-	private static class Entry {
-		
-		private final Field field;
-		private final boolean hasValue;
-		private final boolean collection;
-		private final boolean enumType;
-		private boolean autonomous;
-		private String alias;
-		private String shortName;
-		private String description;
-		private boolean optional;
-		// Ajouter un convertisseur de valeur ?
-		
-		public Entry(Field field, boolean hasValue) {
-			this.field = field;
-			this.hasValue = hasValue;
-			this.collection = Collection.class.isAssignableFrom(field.getType());
-			this.enumType = field.getType().isEnum();
-		}
-		
-		public Field getField() {
-			return field;
-		}
-		
-		public boolean hasValue() {
-			return hasValue;
-		}
-
-		public String getAlias() {
-			return alias;
-		}
-
-		public void setAlias(String alias) {
-			this.alias = alias;
-		}
-
-		public String getShortName() {
-			return shortName;
-		}
-
-		public void setShortName(String shortName) {
-			this.shortName = shortName;
-		}
-		
-		public String getDescription() {
-			return description;
-		}
-
-		public void setDescription(String description) {
-			this.description = description;
-		}
-
-		public void setAutonomous(boolean autonomous) {
-			this.autonomous = autonomous;
-		}
-
-		public boolean isAutonomous() {
-			return autonomous;
-		}
-		
-		public boolean isCollection() {
-			return collection;
-		}
-
-		public boolean isEnumType() {
-			return enumType;
-		}
-
-		public void setOptional(boolean optional) {
-			this.optional = optional;
-		}
-
-		public boolean isOptional() {
-			return optional;
-		}
-	}
 }

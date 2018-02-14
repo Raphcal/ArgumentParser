@@ -20,11 +20,23 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- *
+ * Describes one of the argument.
  * @author Raphaël Calabro (ddaeke-github@yahoo.fr)
  */
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Argument {
+	/**
+	 * Index of the argument. Every argument should have a different index.
+	 * 
+	 * @return the index of the argument.
+	 */
 	int index();
+
+	/**
+	 * Should be set to <code>true</code> if the argument is optional.
+	 * 
+	 * @return <code>true</code> if the argument is optional,
+	 * <code>false</code> otherwise.
+	 */
 	boolean optional() default false;
 }

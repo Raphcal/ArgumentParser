@@ -20,12 +20,33 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- *
+ * Describes an option (also called a flag).
+ * 
  * @author Raphaël Calabro (ddaeke-github@yahoo.fr)
  */
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Option {
+	/**
+	 * Alias to use instead of the property name for the option.
+	 * <p>
+	 * Useful to change an option name from camelCase to dash-case.
+	 * 
+	 * @return the alias of the option.
+	 */
 	String alias() default "";
+	
+	/**
+	 * Description to print in the usage.
+	 * 
+	 * @return the description of the description.
+	 */
 	String description();
+	
+	/**
+	 * Should be set to <code>true</code> if this option can be used without
+	 * the required arguments (for example: help option or version option).
+	 * 
+	 * @return <code>true</code> if this option is autonomous, <code>false</code> otherwise.
+	 */
 	boolean autonomous() default false;
 }
