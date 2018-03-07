@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 Raphaël Calabro <raph_kun at yahoo.fr>.
+ * Copyright (C) 2018 Raphaël Calabro <ddaeke-github at yahoo.fr>.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,19 +19,12 @@
 package com.github.raphcal.argparser;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.lang.reflect.Field;
-import java.nio.charset.Charset;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -45,18 +38,12 @@ import java.util.logging.Logger;
  * @param <T> Type décrivant les arguments du programme.
  */
 public class ArgumentParser<T> {
-	private static final int DEFAULT_LINE_LENGTH = 80;
-	private static final int PREFIX_LENGTH = 9;
-	
 	private final Class<T> clazz;
 			
-	private Map<String, ArgumentParserEntry> options;
-	private List<ArgumentParserEntry> arguments;
-	private int maxOptionNameLength;
+	private final Map<String, ArgumentParserEntry> options;
+	private final List<ArgumentParserEntry> arguments;
 	
 	private int nonOptionalArgumentCount;
-	
-	private int lineLength = DEFAULT_LINE_LENGTH;
 	
 	/**
 	 * Creates a new parser for the given argument list class.
@@ -67,9 +54,9 @@ public class ArgumentParser<T> {
 	public ArgumentParser(Class<T> clazz) {
 		this.clazz = clazz;
 		
-		this.options = new LinkedHashMap<String, ArgumentParserEntry>();
-		this.arguments = new ArrayList<ArgumentParserEntry>();
-		final Map<ArgumentParserEntry, Integer> priorities = new HashMap<ArgumentParserEntry, Integer>();
+		this.options = new LinkedHashMap<>();
+		this.arguments = new ArrayList<>();
+		final Map<ArgumentParserEntry, Integer> priorities = new HashMap<>();
 		
 		final Field[] fields = clazz.getDeclaredFields();
 		for(final Field field : fields) {
@@ -96,10 +83,6 @@ public class ArgumentParser<T> {
 				entry.setShortName(shortName);
 				entry.setDescription(option.description());
 				entry.setAutonomous(option.autonomous());
-				
-				if(name.length() > maxOptionNameLength) {
-					maxOptionNameLength = name.length();
-				}
 			}
 			
 			final Argument argument = field.getAnnotation(Argument.class);
@@ -115,12 +98,7 @@ public class ArgumentParser<T> {
 			}
 		}
 		
-		Collections.sort(arguments, new Comparator<ArgumentParserEntry>() {
-			@Override
-			public int compare(ArgumentParserEntry o1, ArgumentParserEntry o2) {
-				return priorities.get(o1).compareTo(priorities.get(o2));
-			}
-		});
+        arguments.sort((o1, o2) -> priorities.get(o1).compareTo(priorities.get(o2)));
 	}
 	
 	/**
@@ -210,26 +188,14 @@ public class ArgumentParser<T> {
 		}
 	}
 
-	/**
-	 * Change the line length for the usage.
-	 *
-	 * @param lineLength Line length of the terminal window.
-	 */
-	public void setLineLength(int lineLength) {
-		this.lineLength = lineLength;
-	}
-	
-	/**
-	 * Prints the usage to the given output stream.
-	 * 
-	 * @param appName Name of the application.
-	 * @param outputStream Outputstream to use.
-	 * @throws IOException If an error occurs while printing the usage.
-	 */
-	public void printUsage(String appName, OutputStream outputStream) throws IOException {
-		printUsage(appName, new OutputStreamWriter(outputStream, Charset.defaultCharset()));
-	}
-	
+    List<ArgumentParserEntry> getArguments() {
+        return arguments;
+    }
+
+    Map<String, ArgumentParserEntry> getOptions() {
+        return options;
+    }
+
 	/**
 	 * Prints the usage to the given writer.
 	 * 
@@ -237,85 +203,11 @@ public class ArgumentParser<T> {
 	 * @param writer Writer to use.
 	 * @throws IOException If an error occurs while printing the usage.
 	 */
-	public void printUsage(String appName, Writer writer) throws IOException {
-		final String lineSeparator = System.getProperty("line.separator");
-		
-		writer.write("Usage: java -jar ");
-		writer.write(appName);
-		
-		if(!options.isEmpty()) {
-			writer.write(" [options]");
-		}
-		
-		final ArrayList<ArgumentParserEntry> enums = new ArrayList<ArgumentParserEntry>();
-		
-		for(final ArgumentParserEntry entry : arguments) {
-			if (!entry.isOptional()) {
-				writer.write(" <");
-				writer.write(entry.getField().getName());
-				writer.write(">");
-			} else {
-				writer.write(" [");
-				writer.write(entry.getField().getName());
-				writer.write("]");
-			}
-			
-			if(entry.isCollection()) {
-				writer.write(" [...]");
-			}
-			if(entry.isEnumType()) {
-				enums.add(entry);
-			}
-		}
-		writer.write(lineSeparator);
-		
-		if(!enums.isEmpty()) {
-			for(final ArgumentParserEntry entry : enums) {
-				writer.write(capitalize(plurialize(entry.getField().getName())));
-				writer.write(lineSeparator);
-				
-				for (final Object constant : entry.getField().getType().getEnumConstants()) {
-					final Enum<?> enumConstant = (Enum<?>)constant;
-					writer.write("  ");
-					writer.write(enumConstant.name().toLowerCase());
-					writer.write(lineSeparator);
-				}
-			}
-		}
-		
-		if(!options.isEmpty()) {
-			writer.write("Options");
-			writer.write(lineSeparator);
-			
-			final LinkedHashSet<ArgumentParserEntry> entries = new LinkedHashSet<ArgumentParserEntry>();
-			for(final Map.Entry<String, ArgumentParserEntry> entry : options.entrySet()) {
-				entries.add(entry.getValue());
-			}
-			for(final ArgumentParserEntry entry : entries) {
-				final String name = entry.getAlias();
-				
-				writer.write("  ");
-				writer.write(entry.getShortName());
-				writer.write(", --" + name);
-				writer.write(createSpace(maxOptionNameLength - name.length() + 1));
-				
-				final String[] lines = cleanCut(entry.getDescription());
-				for(final String line : lines) {
-					writer.write(line);
-					writer.write(lineSeparator);
-				}
-			}
-		}
-		
-		writer.flush();
-	}
 	
 	private <I> I newInstance(Class<I> clazz) {
 		try {
-			return clazz.newInstance();
-		} catch (InstantiationException ex) {
-			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Impossible d'instancier '" + clazz +"'. Chargement des arguments impossible.", ex);
-		} catch (IllegalAccessException ex) {
+			return clazz.getDeclaredConstructor().newInstance();
+		} catch (InstantiationException | IllegalAccessException | NoSuchMethodException | SecurityException | IllegalArgumentException | InvocationTargetException ex) {
 			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Impossible d'instancier '" + clazz +"'. Chargement des arguments impossible.", ex);
 		}
 		return null;
@@ -339,51 +231,10 @@ public class ArgumentParser<T> {
 				}
 			}
 			
-		} catch (SecurityException ex) {
+		} catch (SecurityException | IllegalAccessException ex) {
 			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Accès non autorisé au champ '" + entry.getField().getName() + "'.", ex);
 		} catch (IllegalArgumentException ex) {
 			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Le champ '" + entry.getField().getName() + "' n'est pas compatible avec le type '" + value.getClass().getName() + "'.", ex);
-		} catch (IllegalAccessException ex) {
-			Logger.getLogger(ArgumentParser.class.getName()).log(Level.SEVERE, "Accès non autorisé au champ '" + entry.getField().getName() + "'.", ex);
-		}
-	}
-	
-	private String createSpace(int length) {
-		final char[] chars = new char[length];
-		Arrays.fill(chars, ' ');
-		return new String(chars);
-	}
-	
-	private String[] cleanCut(String description) {
-		final ArrayList<String> lines = new ArrayList<String>();
-		
-		final StringBuilder stringBuilder = new StringBuilder(description);
-		final int maxLength = lineLength - PREFIX_LENGTH - maxOptionNameLength;
-		
-		while(stringBuilder.length() > maxLength) {
-			int cutIndex = stringBuilder.lastIndexOf(" ", maxLength);
-			if(cutIndex == -1) {
-				cutIndex = maxLength;
-			}
-			lines.add((lines.isEmpty() ? "" : createSpace(PREFIX_LENGTH + maxOptionNameLength)) + 
-					stringBuilder.substring(0, cutIndex));
-			stringBuilder.replace(0, cutIndex + 1, "");
-		}
-		lines.add((lines.isEmpty() ? "" : createSpace(PREFIX_LENGTH + maxOptionNameLength)) + 
-					stringBuilder.toString());
-		
-		return lines.toArray(new String[0]);
-	}
-	
-	private String capitalize(final String source) {
-		return Character.toUpperCase(source.charAt(0)) + source.substring(1);
-	}
-	
-	private String plurialize(final String source) {
-		if (source.endsWith("y")) {
-			return source.substring(0, source.length() - 2) + "ies";
-		} else {
-			return source + 's';
 		}
 	}
 	

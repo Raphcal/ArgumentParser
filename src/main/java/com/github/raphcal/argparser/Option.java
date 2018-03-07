@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 Raphaël Calabro <raph_kun at yahoo.fr>.
+ * Copyright (C) 2018 Raphaël Calabro <ddaeke-github at yahoo.fr>.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
